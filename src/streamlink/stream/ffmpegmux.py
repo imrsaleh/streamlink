@@ -208,6 +208,7 @@ class FFMPEGMuxer(StreamIO):
         maps = options.pop("maps", [])
         copyts = session.options.get("ffmpeg-copyts") or options.pop("copyts", False)
         start_at_zero = session.options.get("ffmpeg-start-at-zero") or options.pop("start_at_zero", False)
+        dkeys = session.options.get("ffmpeg-dkeys") or options.pop("dkeys", False)
 
         self._cmd = [
             self.command(session),
@@ -218,6 +219,9 @@ class FFMPEGMuxer(StreamIO):
         ]
 
         for np in self.pipes:
+            if dkeys:
+                self._cmd.extend(["-thread_queue_size", "32768"])
+                self._cmd.extend(["-cenc_decryption_keys", f"{dkeys}"])
             self._cmd.extend(["-i", str(np.path)])
 
         self._cmd.extend(["-c:v", videocodec])
