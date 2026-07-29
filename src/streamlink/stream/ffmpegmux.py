@@ -223,7 +223,7 @@ class FFMPEGMuxer(StreamIO):
             
             if dkeys:
                 self._cmd.extend(["-thread_queue_size", "32768"])
-                self._cmd.extend(["-decryption_keys", str(dkeys)])
+                self._cmd.extend(["-cenc_decryption_keys", str(dkeys)])
 
             self._cmd.extend(["-i", str(np.path)])
 
@@ -242,7 +242,7 @@ class FFMPEGMuxer(StreamIO):
             for datum in data:
                 stream_id = f":{stream}" if stream else ""
                 self._cmd.extend([f"-metadata{stream_id}", datum])
-                
+
         self._cmd.extend(["-f", ofmt, outpath])
         
         log.debug("ffmpeg command: %r", self._cmd)
