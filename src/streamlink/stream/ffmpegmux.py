@@ -221,7 +221,8 @@ class FFMPEGMuxer(StreamIO):
         for np in self.pipes:
             if dkeys:
                 self._cmd.extend(["-thread_queue_size", "32768"])
-                self._cmd.extend(["-cenc_decryption_keys", f"{dkeys}"])
+                self._cmd.extend(["-cenc_decryption_keys", str(dkeys)])
+
             self._cmd.extend(["-i", str(np.path)])
 
         self._cmd.extend(["-c:v", videocodec])
