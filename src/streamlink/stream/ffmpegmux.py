@@ -216,13 +216,15 @@ class FFMPEGMuxer(StreamIO):
             "-nostats",
             "-loglevel",
             loglevel,
+            "-f", 
+            ofmt
         ]
         
-
+        if dkeys:
+            self._cmd.extend(["-thread_queue_size", "32768"])
+            self._cmd.extend(["-decryption_keys", str(dkeys)])
         for np in self.pipes:
-            if dkeys:
-                self._cmd.extend(["-thread_queue_size", "32768"])
-                self._cmd.extend(["-decryption_keys", str(dkeys)])
+            
 
             self._cmd.extend(["-i", str(np.path)])
 
@@ -242,7 +244,8 @@ class FFMPEGMuxer(StreamIO):
                 stream_id = f":{stream}" if stream else ""
                 self._cmd.extend([f"-metadata{stream_id}", datum])
 
-        self._cmd.extend(["-f", ofmt, outpath])
+        self._cmd.extend([outpath])
+        
         log.debug("ffmpeg command: %r", self._cmd)
 
         if session.options.get("ffmpeg-verbose-path"):
