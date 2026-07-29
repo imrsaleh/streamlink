@@ -220,11 +220,11 @@ class FFMPEGMuxer(StreamIO):
             ofmt
         ]
         
-        if dkeys:
-            self._cmd.extend(["-thread_queue_size", "32768"])
-            self._cmd.extend(["-decryption_keys", str(dkeys)])
+        
         for np in self.pipes:
-            
+            if dkeys:
+                self._cmd.extend(["-thread_queue_size", "32768"])
+                self._cmd.extend(["-decryption_keys", str(dkeys)])
 
             self._cmd.extend(["-i", str(np.path)])
 
