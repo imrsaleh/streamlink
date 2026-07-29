@@ -309,8 +309,8 @@ class DASHStream(Stream):
 
         manifest, mpd_params = cls.fetch_manifest(session, url_or_manifest, **kwargs)
         passthrough_encrypted = session.options.get("stream-passthrough-encrypted")
-        ffmpeg_dkeys = session.options.get("ffmpeg_dkeys")
-        allow_encrypted = ffmpeg_dkeys or passthrough_encrypted
+        ffmpeg_dkey = session.options.get("ffmpeg_dkey")
+        allow_encrypted = ffmpeg_dkey or passthrough_encrypted
 
         try:
             mpd = cls.parse_mpd(manifest, mpd_params)
@@ -346,7 +346,7 @@ class DASHStream(Stream):
                 elif rep.mimeType.startswith("audio"):  # pragma: no branch
                     audio.append(rep)
 
-        if passthrough_encrypted and not ffmpeg_dkeys:
+        if passthrough_encrypted and not ffmpeg_dkey:
             is_encrypted = any(
                 aset.contentProtections or any(rep.contentProtections for rep in aset.representations)
                 for aset in period_selection.adaptationSets

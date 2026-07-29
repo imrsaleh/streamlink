@@ -262,10 +262,10 @@ class StreamlinkOptions(Options):
           - ``bool``
           - ``False``
           - When ``ffmpeg-copyts`` is ``True``, shift timestamps to zero
-        * - ffmpeg-dkeys
+        * - ffmpeg-dkey
           - ``str | None``
           - ``None``
-          - Decryption keys kid1=key1:kid2=key2...
+          - Decryption key HEX
         * - webbrowser
           - ``bool``
           - ``True``
@@ -334,7 +334,7 @@ class StreamlinkOptions(Options):
             "ffmpeg-audio-transcode": None,
             "ffmpeg-copyts": False,
             "ffmpeg-start-at-zero": False,
-            "ffmpeg-dkeys": None,
+            "ffmpeg-dkey": None,
             "webbrowser": True,
             "webbrowser-executable": None,
             "webbrowser-timeout": 20.0,
