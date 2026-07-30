@@ -309,7 +309,7 @@ class DASHStream(Stream):
 
         manifest, mpd_params = cls.fetch_manifest(session, url_or_manifest, **kwargs)
         passthrough_encrypted = session.options.get("stream-passthrough-encrypted")
-        ffmpeg_dkey = session.options.get("ffmpeg_dkey")
+        ffmpeg_dkey = session.options.get("ffmpeg_dkeys")
         allow_encrypted = ffmpeg_dkey or passthrough_encrypted
 
         try:

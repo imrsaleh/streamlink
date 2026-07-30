@@ -262,10 +262,10 @@ class StreamlinkOptions(Options):
           - ``bool``
           - ``False``
           - When ``ffmpeg-copyts`` is ``True``, shift timestamps to zero
-        * - ffmpeg-dkey
+        * - ffmpeg-dkeys
           - ``str | None``
           - ``None``
-          - Decryption key HEX
+          - Decryption key kid1=key2:kid2=key2...
         * - webbrowser
           - ``bool``
           - ``True``
