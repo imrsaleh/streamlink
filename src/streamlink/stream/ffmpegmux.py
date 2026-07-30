@@ -210,40 +210,50 @@ class FFMPEGMuxer(StreamIO):
         start_at_zero = session.options.get("ffmpeg-start-at-zero") or options.pop("start_at_zero", False)
         dkey = session.options.get("ffmpeg-dkey") or options.pop("dkey", False)
 
-        self._cmd = [
-            self.command(session),
-            "-y",
-            "-nostats",
-            "-loglevel",
-            loglevel,
-        ]
+        if dkey:
+            self._cmd = [
+                "mp4decrypt.exe",
+                "-key", 
+                str(dkey)
+            ]
+        else:
+            self._cmd = [
+                self.command(session),
+                "-y",
+                "-nostats",
+                "-loglevel",
+                loglevel,
+            ]
         
-        
+        #['C:\\Program Files\\Streamlink\\ffmpeg\\ffmpeg.exe', '-y', '-nostats', '-loglevel', 'info', '-thread_queue_size', '32768', '-decryption_key', '17774f82a3b9e33ea7a149596acbb20f', '-i', '\\\\.\\pipe\\streamlinkpipe-3380-1-5810', '-thread_queue_size', '32768', '-decryption_key', '17774f82a3b9e33ea7a149596acbb20f', '-i', '\\\\.\\pipe\\streamlinkpipe-3380-2-3060', '-c:v', 'copy', '-c:a', 'copy', '-copyts', '-f', 'matroska', 'pipe:1']
         for np in self.pipes:
-            
             if dkey:
-                self._cmd.extend(["-thread_queue_size", "32768"])
-                self._cmd.extend(["-decryption_key", str(dkey)])
-
-            self._cmd.extend(["-i", str(np.path)])
-
-        self._cmd.extend(["-c:v", videocodec])
-        self._cmd.extend(["-c:a", audiocodec])
+                self._cmd.extend([str(np.path)])
+            else:
+                self._cmd.extend(["-i", str(np.path)])
+        if not dkey:
+            self._cmd.extend(["-c:v", videocodec])
+            self._cmd.extend(["-c:a", audiocodec])
 
         for m in maps:
-            self._cmd.extend(["-map", str(m)])
+            if not dkey:
+                self._cmd.extend(["-map", str(m)])
 
         if copyts:
-            self._cmd.extend(["-copyts"])
-            if start_at_zero:
-                self._cmd.extend(["-start_at_zero"])
+            if not dkey:
+                self._cmd.extend(["-copyts"])
+                if start_at_zero:
+                    self._cmd.extend(["-start_at_zero"])
 
         for stream, data in metadata.items():
             for datum in data:
                 stream_id = f":{stream}" if stream else ""
-                self._cmd.extend([f"-metadata{stream_id}", datum])
-
-        self._cmd.extend(["-f", ofmt, outpath])
+                if not dkey:
+                    self._cmd.extend([f"-metadata{stream_id}", datum])
+        if dkey:
+            self._cmd.extend([outpath])
+        else:
+            self._cmd.extend(["-f", ofmt, outpath])
         
         log.debug("ffmpeg command: %r", self._cmd)
 
