@@ -86,26 +86,26 @@ class MuxedStream(Stream, Generic[TSubstreams_co]):
     def is_usable(cls, session):
         return FFMPEGMuxer.is_usable(session)
 
-
 class FFMPEGMuxer(StreamIO):
     __commands__: ClassVar[list[str]] = ["ffmpeg"]
-
+    __decrypt_commands__: ClassVar[list[str]] = ["mp4decrypt"]
+ 
     DEFAULT_LOGLEVEL = "info"
     DEFAULT_OUTPUT_FORMAT = "matroska"
     DEFAULT_VIDEO_CODEC = "copy"
     DEFAULT_AUDIO_CODEC = "copy"
-
+ 
     FFMPEG_VERSION: str | None = None
     FFMPEG_VERSION_TIMEOUT = 4.0
-
+ 
     errorlog: int | TextIO
-
+ 
     process: subprocess.Popen | None
-
+ 
     @classmethod
     def is_usable(cls, session):
         return cls.command(session) is not None
-
+ 
     @classmethod
     def command(cls, session):
         with _lock_resolve_command:
@@ -115,7 +115,7 @@ class FFMPEGMuxer(StreamIO):
                 not session.options.get("ffmpeg-no-validation"),
                 timeout,
             )
-
+ 
     @classmethod
     @lru_cache(maxsize=128)
     def _resolve_command(
@@ -132,7 +132,7 @@ class FFMPEGMuxer(StreamIO):
                 resolved = which(cmd)
                 if resolved:
                     break
-
+ 
         if resolved and validate:
             log.trace("Querying FFmpeg version: %r", [resolved, "-version"])
             versionoutput = FFmpegVersionOutput([resolved, "-version"], timeout=timeout)
@@ -144,19 +144,24 @@ class FFMPEGMuxer(StreamIO):
                 cls.FFMPEG_VERSION = versionoutput.version
                 for i, line in enumerate(versionoutput.output):
                     log.debug(f" {line}" if i > 0 else line)
-
+ 
         if not resolved:
             log.warning("No valid FFmpeg binary was found. See the --ffmpeg-ffmpeg option.")
             log.warning("Muxing streams is unsupported! Only a subset of the available streams can be returned!")
-
+ 
         return resolved
-
+ 
+    @classmethod
+    def decrypt_command(cls, session) -> str | None:
+        cmd = session.options.get("ffmpeg-mp4decrypt") or None
+        return which(cmd) if cmd else which(cls.__decrypt_commands__[0])
+ 
     @staticmethod
     def copy_to_pipe(muxer: FFMPEGMuxer, stream: StreamIO, pipe: NamedPipeBase):
         log.debug(f"Starting copy to pipe: {pipe.path}")
         # TODO: catch OSError when creating/opening pipe fails and close entire output stream
         pipe.open()
-
+ 
         data = b""
         while True:
             try:
@@ -164,11 +169,11 @@ class FFMPEGMuxer(StreamIO):
             except (OSError, ValueError) as err:
                 log.error(f"Error while reading from substream: {err}")
                 break
-
+ 
             if data == b"":
                 log.debug(f"Pipe copy complete: {pipe.path}")
                 break
-
+ 
             try:
                 pipe.write(data)
             except OSError as err:
@@ -177,28 +182,31 @@ class FFMPEGMuxer(StreamIO):
                     break
                 log.error(f"Error while writing to pipe {pipe.path}: {err}")
                 break
-
+ 
         with suppress(OSError):
             pipe.close()
-
+ 
     def __init__(self, session, *streams, **options):
         self.session = session
         self.process = None
+        self.decrypt_processes: list[subprocess.Popen] = []
         self.errorlog = subprocess.DEVNULL
-
+ 
         if not self.is_usable(session):
             raise StreamError("Cannot use FFmpeg")
-
+ 
         self.streams = streams
-        self.pipes = [NamedPipe() for _ in self.streams]
+ 
+        # raw pipes: written to by copy_to_pipe() threads (may hold encrypted data)
+        self.input_pipes = [NamedPipe() for _ in self.streams]
         self.pipe_threads = [
             threading.Thread(
                 target=self.copy_to_pipe,
                 args=(self, stream, np),
             )
-            for stream, np in zip(self.streams, self.pipes, strict=True)
+            for stream, np in zip(self.streams, self.input_pipes, strict=True)
         ]
-
+ 
         loglevel = session.options.get("ffmpeg-loglevel") or options.pop("loglevel", self.DEFAULT_LOGLEVEL)
         ofmt = session.options.get("ffmpeg-fout") or options.pop("format", self.DEFAULT_OUTPUT_FORMAT)
         outpath = options.pop("outpath", "pipe:1")
@@ -208,83 +216,121 @@ class FFMPEGMuxer(StreamIO):
         maps = options.pop("maps", [])
         copyts = session.options.get("ffmpeg-copyts") or options.pop("copyts", False)
         start_at_zero = session.options.get("ffmpeg-start-at-zero") or options.pop("start_at_zero", False)
-        dkey = session.options.get("ffmpeg-dkey") or options.pop("dkey", False)
-
-        if dkey:
-            self._cmd = [
-                "mp4decrypt.exe",
-                "-key", 
-                str(dkey)
-            ]
-        else:
-            self._cmd = [
-                self.command(session),
-                "-y",
-                "-nostats",
-                "-loglevel",
-                loglevel,
-            ]
-        
-        #['C:\\Program Files\\Streamlink\\ffmpeg\\ffmpeg.exe', '-y', '-nostats', '-loglevel', 'info', '-thread_queue_size', '32768', '-decryption_key', '17774f82a3b9e33ea7a149596acbb20f', '-i', '\\\\.\\pipe\\streamlinkpipe-3380-1-5810', '-thread_queue_size', '32768', '-decryption_key', '17774f82a3b9e33ea7a149596acbb20f', '-i', '\\\\.\\pipe\\streamlinkpipe-3380-2-3060', '-c:v', 'copy', '-c:a', 'copy', '-copyts', '-f', 'matroska', 'pipe:1']
-        for np in self.pipes:
-            if dkey:
-                self._cmd.extend([str(np.path)])
+ 
+        # --- decryption keys -------------------------------------------------
+        # Accepted forms:
+        #   "KID:KEY"                      -> applied to every stream
+        #   {0: "KID:KEY", 2: "KID:KEY"}   -> per-stream index -> key
+        #   ["KID:KEY", None, "KID:KEY"]   -> per-stream list, aligned with `streams`
+        dkey = session.options.get("ffmpeg-dkey") or options.pop("dkey", None)
+        self.decrypt_keys = self._normalize_keys(dkey, len(self.streams))
+ 
+        if any(self.decrypt_keys) and not self.decrypt_command(session):
+            raise StreamError("Cannot use mp4decrypt: binary not found. See the --ffmpeg-mp4decrypt option.")
+ 
+        # ffmpeg reads from `ffmpeg_input_pipes`: either the raw pipe (no key)
+        # or a second pipe that sits downstream of an mp4decrypt process.
+        self.ffmpeg_input_pipes: list[NamedPipeBase] = []
+        for idx, ip in enumerate(self.input_pipes):
+            if self.decrypt_keys[idx]:
+                self.ffmpeg_input_pipes.append(NamedPipe())
             else:
-                self._cmd.extend(["-i", str(np.path)])
-        if not dkey:
-            self._cmd.extend(["-c:v", videocodec])
-            self._cmd.extend(["-c:a", audiocodec])
-
+                self.ffmpeg_input_pipes.append(ip)
+ 
+        # --- build the ffmpeg command (always a real ffmpeg invocation) -----
+        self._cmd = [
+            self.command(session),
+            "-y",
+            "-nostats",
+            "-loglevel",
+            loglevel,
+        ]
+ 
+        for p in self.ffmpeg_input_pipes:
+            self._cmd.extend(["-i", str(p.path)])
+ 
+        self._cmd.extend(["-c:v", videocodec])
+        self._cmd.extend(["-c:a", audiocodec])
+ 
         for m in maps:
-            if not dkey:
-                self._cmd.extend(["-map", str(m)])
-
+            self._cmd.extend(["-map", str(m)])
+ 
         if copyts:
-            if not dkey:
-                self._cmd.extend(["-copyts"])
-                if start_at_zero:
-                    self._cmd.extend(["-start_at_zero"])
-
+            self._cmd.extend(["-copyts"])
+            if start_at_zero:
+                self._cmd.extend(["-start_at_zero"])
+ 
         for stream, data in metadata.items():
             for datum in data:
                 stream_id = f":{stream}" if stream else ""
-                if not dkey:
-                    self._cmd.extend([f"-metadata{stream_id}", datum])
-        if dkey:
-            self._cmd.extend([outpath])
-        else:
-            self._cmd.extend(["-f", ofmt, outpath])
-        
+                self._cmd.extend([f"-metadata{stream_id}", datum])
+ 
+        self._cmd.extend(["-f", ofmt, outpath])
+ 
         log.debug("ffmpeg command: %r", self._cmd)
-
+ 
         if session.options.get("ffmpeg-verbose-path"):
             self.errorlog = Path(session.options.get("ffmpeg-verbose-path")).expanduser().open("w")
         elif session.options.get("ffmpeg-verbose"):
             self.errorlog = sys.stderr
-
+ 
+    @staticmethod
+    def _normalize_keys(dkey, count: int) -> list[str | None]:
+        if not dkey:
+            return [None] * count
+        if isinstance(dkey, dict):
+            return [dkey.get(i) for i in range(count)]
+        if isinstance(dkey, (list, tuple)):
+            keys = list(dkey) + [None] * (count - len(dkey))
+            return keys[:count]
+        # single string -> apply to every stream
+        return [str(dkey)] * count
+ 
     def open(self):
+        # 1. writers for the raw (possibly encrypted) pipes
         for t in self.pipe_threads:
             t.daemon = True
             t.start()
+ 
+        # 2. one mp4decrypt process per stream that has a key, sitting
+        #    between the raw pipe and the pipe ffmpeg will read from
+        decrypt_cmd = self.decrypt_command(self.session)
+        for idx, key in enumerate(self.decrypt_keys):
+            if not key:
+                continue
+            src = self.input_pipes[idx]
+            dst = self.ffmpeg_input_pipes[idx]
+            cmd = [decrypt_cmd, "--key", key, str(src.path), str(dst.path)]
+            log.debug("mp4decrypt command: %r", cmd)
+            self.decrypt_processes.append(
+                subprocess.Popen(cmd, stdout=self.errorlog, stderr=self.errorlog),
+            )
+ 
+        # 3. ffmpeg reads from ffmpeg_input_pipes and muxes into outpath
         self.process = subprocess.Popen(self._cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=self.errorlog)
-
+ 
         return self
-
+ 
     def read(self, size=-1):
         return self.process.stdout.read(size)  # type: ignore[attr-defined, ty:unresolved-attribute]
-
+ 
     def close(self):
         if self.closed:
             return
-
+ 
         log.debug("Closing ffmpeg thread")
         if self.process:
             # kill ffmpeg
             self.process.kill()
             self.process.stdout.close()  # type: ignore[attr-defined, ty:unresolved-attribute]
-
+ 
+            # kill any mp4decrypt processes still running
+            for p in self.decrypt_processes:
+                with suppress(Exception):
+                    p.kill()
+ 
             executor = concurrent.futures.ThreadPoolExecutor()
-
+ 
             # close the substreams
             futures = [
                 executor.submit(stream.close)
@@ -293,7 +339,7 @@ class FFMPEGMuxer(StreamIO):
             ]  # fmt: skip
             concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
             log.debug("Closed all the substreams")
-
+ 
             # wait for substream copy-to-pipe threads to terminate and clean up the opened pipes
             timeout = self.session.options.get("stream-timeout")
             futures = [
@@ -301,13 +347,19 @@ class FFMPEGMuxer(StreamIO):
                 for thread in self.pipe_threads
             ]  # fmt: skip
             concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
-
+ 
+            # wait for mp4decrypt processes to exit
+            futures = [
+                executor.submit(p.wait, timeout=timeout)
+                for p in self.decrypt_processes
+            ]  # fmt: skip
+            concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+ 
         if self.errorlog is not sys.stderr and not isinstance(self.errorlog, int):
             with suppress(OSError):
                 self.errorlog.close()
-
+ 
         super().close()
-
 
 class FFmpegVersionOutput(ProcessOutput):
     # The version output format of the fftools hasn't been changed since n0.7.1 (2011-04-23):
