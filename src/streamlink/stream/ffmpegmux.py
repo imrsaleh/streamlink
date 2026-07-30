@@ -190,6 +190,7 @@ class FFMPEGMuxer(StreamIO):
         self.session = session
         self.process = None
         self.decrypt_processes: list[subprocess.Popen] = []
+        self.decrypt_relay_threads: list[threading.Thread] = []
         self.errorlog = subprocess.DEVNULL
  
         if not self.is_usable(session):
@@ -292,21 +293,43 @@ class FFMPEGMuxer(StreamIO):
             t.daemon = True
             t.start()
  
-        # 2. one mp4decrypt process per stream that has a key, sitting
-        #    between the raw pipe and the pipe ffmpeg will read from
+        # 2. one mp4decrypt process per stream that has a key.
+        #
+        #    IMPORTANT (Windows): a Windows named pipe is a server/single-client
+        #    construct, not a kernel FIFO. Two independent external processes
+        #    (mp4decrypt and ffmpeg) cannot rendezvous through a pipe path that
+        #    neither of them created -- only whichever process called
+        #    CreateNamedPipe (here: streamlink/Python) can be an actual
+        #    endpoint. So mp4decrypt must NOT write directly to the pipe ffmpeg
+        #    reads from; it writes to its own stdout instead ("-stdout#", a
+        #    Bento4 special filename), and Python relays those bytes into the
+        #    ffmpeg-facing named pipe -- exactly the same pattern already used
+        #    for the raw substreams via copy_to_pipe(). Python stays the one
+        #    real endpoint of every named pipe, on both Windows and POSIX.
         decrypt_cmd = self.decrypt_command(self.session)
         for idx, key in enumerate(self.decrypt_keys):
             if not key:
                 continue
             src = self.input_pipes[idx]
-            dst = self.ffmpeg_input_pipes[idx]
-            cmd = [decrypt_cmd, "--key", key, str(src.path), str(dst.path)]
+            cmd = [decrypt_cmd, "--key", key, str(src.path), "-stdout#"]
             log.debug("mp4decrypt command: %r", cmd)
-            self.decrypt_processes.append(
-                subprocess.Popen(cmd, stdout=self.errorlog, stderr=self.errorlog),
-            )
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=self.errorlog)
+            self.decrypt_processes.append(proc)
  
-        # 3. ffmpeg reads from ffmpeg_input_pipes and muxes into outpath
+            # relay thread: proc.stdout (decrypted bytes) -> ffmpeg_input_pipes[idx]
+            relay = threading.Thread(
+                target=self.copy_to_pipe,
+                args=(self, proc.stdout, self.ffmpeg_input_pipes[idx]),
+            )
+            relay.daemon = True
+            self.decrypt_relay_threads.append(relay)
+ 
+        for t in self.decrypt_relay_threads:
+            t.start()
+ 
+        # 3. ffmpeg reads from ffmpeg_input_pipes and muxes into outpath.
+        #    This must come last: it's what unblocks the relay threads'
+        #    pipe.open() calls above (and, transitively, mp4decrypt's writes).
         self.process = subprocess.Popen(self._cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=self.errorlog)
  
         return self
@@ -324,10 +347,12 @@ class FFMPEGMuxer(StreamIO):
             self.process.kill()
             self.process.stdout.close()  # type: ignore[attr-defined, ty:unresolved-attribute]
  
-            # kill any mp4decrypt processes still running
+            # kill any mp4decrypt processes still running and close their stdout
             for p in self.decrypt_processes:
                 with suppress(Exception):
                     p.kill()
+                with suppress(Exception):
+                    p.stdout.close()  # type: ignore[union-attr]
  
             executor = concurrent.futures.ThreadPoolExecutor()
  
@@ -345,6 +370,13 @@ class FFMPEGMuxer(StreamIO):
             futures = [
                 executor.submit(thread.join, timeout=timeout)
                 for thread in self.pipe_threads
+            ]  # fmt: skip
+            concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
+ 
+            # wait for decrypt-relay threads (mp4decrypt stdout -> ffmpeg pipe) to terminate
+            futures = [
+                executor.submit(thread.join, timeout=timeout)
+                for thread in self.decrypt_relay_threads
             ]  # fmt: skip
             concurrent.futures.wait(futures, return_when=concurrent.futures.ALL_COMPLETED)
  
