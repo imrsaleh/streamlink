@@ -1,4 +1,5 @@
 # this is a fork version of streamlink 8.4.0
+![key](https://www.readmecodegen.com/api/social-icon?name=key&size=24)
 in this version you can set Multiple decryption keys using 
 
 ```sh
@@ -7,11 +8,11 @@ streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
 
 
 # 📦 Installation
-  download for Windows: https://github.com/imrsaleh/streamlink/releases/latest
+  ![windows](https://www.readmecodegen.com/api/social-icon?name=windows&size=24) https://github.com/imrsaleh/streamlink/releases/latest
 
 
-
-  for linux First u need a custom version of FFMPEG by BtbN
+    
+  ![linux](https://www.readmecodegen.com/api/social-icon?name=linux&size=24) for linux First u need a custom version of FFMPEG by BtbN
 
   ```sh
   $ curl -L \
@@ -30,5 +31,5 @@ streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
   ```
 
 
-# Cridets
+# ![coins](https://www.readmecodegen.com/api/social-icon?name=coins&size=24) Cridets
   STREAMLINK TEAM: https://github.com/streamlink/streamlink
