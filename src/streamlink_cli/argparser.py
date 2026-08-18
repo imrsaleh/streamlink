@@ -1308,9 +1308,9 @@ def build_parser():
         type=str,
         metavar="DKEY",
         help="""
-            Set the decryption key
+            Set the decryption keys
 
-            Example: --ffmpeg-dkey HEX
+            Example: --ffmpeg-dkey KID1=KEY1:KID2=KEY2
         """,
     )
     transport_ffmpeg.add_argument(

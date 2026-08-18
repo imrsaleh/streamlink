@@ -336,11 +336,11 @@ class DASHStream(Stream):
 
         # Search for suitable video and audio representations
         for aset in period_selection.adaptationSets:
-            # if aset.contentProtections and not allow_encrypted:
-            #     raise PluginError(f"{source} is protected by DRM")
+            if aset.contentProtections and not allow_encrypted:
+                raise PluginError(f"{source} is protected by DRM")
             for rep in aset.representations:
-                # if rep.contentProtections and not allow_encrypted:
-                #     raise PluginError(f"{source} is protected by DRM")
+                if rep.contentProtections and not allow_encrypted:
+                    raise PluginError(f"{source} is protected by DRM")
                 if rep.mimeType.startswith("video"):
                     video.append(rep)
                 elif rep.mimeType.startswith("audio"):  # pragma: no branch
