@@ -31,5 +31,5 @@ streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
   ```
 
 
-# ![coins](https://www.readmecodegen.com/api/social-icon?name=coins&size=24) Cridets
+# ![coins](https://www.readmecodegen.com/api/social-icon?name=coins&size=24) Credits
   STREAMLINK TEAM: https://github.com/streamlink/streamlink
