@@ -7,7 +7,7 @@ streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
 
 
 # 📦 Installation
-  [Windows]: https://github.com/imrsaleh/streamlink/releases/latest
+  download for Windows: https://github.com/imrsaleh/streamlink/releases/latest
 
 
 
@@ -31,4 +31,4 @@ streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
 
 
 # Cridets
-  [STREAMLINK TEAM]: https://github.com/streamlink/streamlink
+  STREAMLINK TEAM: https://github.com/streamlink/streamlink
