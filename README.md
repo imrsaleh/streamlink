@@ -1,3 +1,13 @@
+# this is a fork version of streamlink 8.4.0
+in this version you can set Multiple decryption keys using 
+
+```sh
+streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
+```
+
+
+
+
 <h1 align="center"><a href="https://streamlink.github.io/">Streamlink<br><img height="150" alt="Streamlink" src="https://raw.githubusercontent.com/streamlink/streamlink/master/icon.svg"></a></h1>
 
 <p align="center">
