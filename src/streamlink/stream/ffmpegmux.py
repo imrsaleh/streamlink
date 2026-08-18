@@ -225,7 +225,7 @@ class FFMPEGMuxer(StreamIO):
                 self._cmd.extend([
                     "-thread_queue_size",
                     "32768",
-                    "-decryption_key",
+                    "-decryption_keys",
                     str(dkey)
                     ])
 
