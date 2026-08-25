@@ -1,10 +1,33 @@
 # this is a fork version of streamlink 8.4.0
 ![key](https://www.readmecodegen.com/api/social-icon?name=key&size=24)
-in this version you can set Multiple decryption keys using 
+**New features in this version**
+
+**set Multiple or single decryption keys using** `-ffmpeg-dkey`
 
 ```sh
+streamlink --ffmpeg-dkey KID1=KEY1 <url> <best>
+or
 streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
 ```
+
+**set custom video fps using** `--ffmpeg-framerate`
+
+it uses libx264 for transcoding by default 
+but that could hurt your cpu performance so it can be combined with option `--ffmpeg-video-transcode` to use GPU instead
+
+Nvidia: `h264_nvenc` or `hevc_nvenc`
+
+intel: `h264_qsv` or `hevc_qsv`
+
+AMD: `h264_amf` or `hevc_amf`
+*example: change video from (original 50fps) to 25fps*
+  ```sh
+  streamlink --ffmpeg-framerate 25 <url> <best>
+  or
+  streamlink --ffmpeg-video-transcode h264_nvenc --ffmpeg-framerate 25 <url> <best>
+  ```
+
+  
 
 
 # 📦 Installation
