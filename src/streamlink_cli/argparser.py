@@ -1314,6 +1314,16 @@ def build_parser():
         """,
     )
     transport_ffmpeg.add_argument(
+        "--ffmpeg-framerate",
+        type=str,
+        metavar="FRAMERATE",
+        help="""
+            Set video framerate
+
+            Example: --ffmpeg-framerate 25
+        """,
+    )
+    transport_ffmpeg.add_argument(
         "--ffmpeg-audio-transcode",
         metavar="CODEC",
         help="""
@@ -1606,6 +1616,7 @@ _ARGUMENT_TO_SESSIONOPTION: list[tuple[str, str, Callable[[Any], Any] | type | N
     ("ffmpeg_loglevel", "ffmpeg-loglevel", None),
     ("ffmpeg_fout", "ffmpeg-fout", None),
     ("ffmpeg_dkey", "ffmpeg-dkey", None),
+    ("ffmpeg_framerate", "ffmpeg-framerate", None),
     ("ffmpeg_video_transcode", "ffmpeg-video-transcode", None),
     ("ffmpeg_audio_transcode", "ffmpeg-audio-transcode", None),
     ("ffmpeg_copyts", "ffmpeg-copyts", None),

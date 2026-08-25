@@ -266,6 +266,10 @@ class StreamlinkOptions(Options):
           - ``str | None``
           - ``None``
           - Decryption key HEX
+        * - ffmpeg-framerate
+            - ``str | None``
+            - ``None``
+            - Set video FRAMERATE
         * - webbrowser
           - ``bool``
           - ``True``
@@ -335,6 +339,7 @@ class StreamlinkOptions(Options):
             "ffmpeg-copyts": False,
             "ffmpeg-start-at-zero": False,
             "ffmpeg-dkey": None,
+            "ffmpeg-framerate": None,
             "webbrowser": True,
             "webbrowser-executable": None,
             "webbrowser-timeout": 20.0,
