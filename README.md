@@ -1,41 +1,60 @@
-# this is a fork version of streamlink 8.4.0
-![key](https://www.readmecodegen.com/api/social-icon?name=key&size=24)
-**New features in this version**
+# Streamlink (Modified Fork)
 
-**set Multiple or single decryption keys using** `-ffmpeg-dkey`
+This is a custom fork of [Streamlink](https://github.com/streamlink/streamlink) based on version 8.4.0, featuring extended FFmpeg options for decryption and video transcoding.
+
+---
+
+## 🌟 New Features
+
+### 1. Multiple or Single Decryption Keys (`--ffmpeg-dkey`)
+Set one or multiple decryption keys directly using `--ffmpeg-dkey`:
 
 ```sh
-streamlink --ffmpeg-dkey KID1=KEY1 <url> <best>
-or
-streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> <best>
+# Single key
+streamlink --ffmpeg-dkey KID1=KEY1 <url> best
+
+# Multiple keys
+streamlink --ffmpeg-dkey KID1=KEY1:KID2=KEY2 <url> best
 ```
 
-**set custom video fps using** `--ffmpeg-framerate`
 
-it uses libx264 for transcoding by default 
-but that could hurt your cpu performance so it can be combined with option `--ffmpeg-video-transcode` to use GPU instead
 
-Nvidia: `h264_nvenc` or `hevc_nvenc`
+### 2. Custom Video Frame Rate (--ffmpeg-framerate)
 
-intel: `h264_qsv` or `hevc_qsv`
+Change the video framerate on the fly. By default, it uses libx264 for software encoding, which can be CPU intensive.
 
-AMD: `h264_amf` or `hevc_amf`
-*example: change video from (original 50fps) to 25fps*
-  ```sh
-  streamlink --ffmpeg-framerate 25 <url> <best>
-  or
-  streamlink --ffmpeg-video-transcode h264_nvenc --ffmpeg-framerate 25 <url> <best>
+You can combine it with --ffmpeg-video-transcode to enable hardware acceleration (GPU):
+
+NVIDIA: h264_nvenc or hevc_nvenc
+
+Intel: h264_qsv or hevc_qsv
+
+AMD: h264_amf or hevc_amf
+
+Example: Change video framerate from 50fps to 25fps:
+
+```sh
+# Software encoding (CPU)
+streamlink --ffmpeg-framerate 25 <url> best
+
+# Hardware encoding (NVIDIA GPU)
+streamlink --ffmpeg-video-transcode h264_nvenc --ffmpeg-framerate 25 <url> best
   ```
 
   
 
 
 # 📦 Installation
-  ![windows](https://www.readmecodegen.com/api/social-icon?name=windows&size=24) https://github.com/imrsaleh/streamlink/releases/latest
+  
+  ### Windows ![windows](https://www.readmecodegen.com/api/social-icon?name=windows&size=24)
+  
+  Download the latest Windows binary release from
+  https://github.com/imrsaleh/streamlink/releases/latest
 
-
+  ---
     
-  ![linux](https://www.readmecodegen.com/api/social-icon?name=linux&size=24) for linux First u need a custom version of FFMPEG by BtbN
+  ### Linux ![linux](https://www.readmecodegen.com/api/social-icon?name=linux&size=24) 
+   Install a compatible build of FFmpeg (e.g., BtbN builds):
 
   ```sh
   $ curl -L \
@@ -47,12 +66,16 @@ AMD: `h264_amf` or `hevc_amf`
     && rm -rf /tmp/ffmpeg /tmp/ffmpeg.tar.xz
   ```
   
-  then..
+  Install this modified Streamlink version via pip:
 
   ```sh
   $ pip install --no-cache-dir git+https://github.com/imrsaleh/streamlink.git
   ```
 
 
-# ![coins](https://www.readmecodegen.com/api/social-icon?name=coins&size=24) Credits
+
   STREAMLINK TEAM: https://github.com/streamlink/streamlink
+
+
+# ![coins](https://www.readmecodegen.com/api/social-icon?name=coins&size=24) Credits
+- Original project by [Streamlink](https://github.com/streamlink/streamlink)
