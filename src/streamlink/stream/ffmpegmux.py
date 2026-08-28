@@ -232,7 +232,7 @@ class FFMPEGMuxer(StreamIO):
             self._cmd.extend(["-i", str(np.path)])
 
         if set_fps:
-            self._cmd.extend(["-vf:v?", f"fps={str(set_fps)}"])
+            self._cmd.extend(["-r", str(set_fps)])
             if videocodec == "copy":
                 self._cmd.extend(["-c:v", "libx264"])
             else:
