@@ -249,6 +249,39 @@ class EventedWriterHLSStream(HLSStream):
     __reader__ = EventedWriterHLSStreamReader
 
 
+def test_hlsstream_open_with_ffmpeg_framerate(
+    monkeypatch: pytest.MonkeyPatch,
+    session: Streamlink,
+):
+    session.set_option("ffmpeg-framerate", "25")
+    reader = Mock()
+    muxer = Mock()
+    muxer.return_value.open.return_value = Mock()
+    monkeypatch.setattr(HLSStream, "__reader__", Mock(return_value=reader))
+    monkeypatch.setattr("streamlink.stream.hls.hls.FFMPEGMuxer", muxer)
+
+    stream = HLSStream(session, "https://foo/playlist.m3u8")
+    result = stream.open()
+
+    reader.open.assert_called_once_with()
+    muxer.assert_called_once_with(session, reader, format="mpegts")
+    assert result is muxer.return_value.open.return_value
+
+
+def test_hlsstream_open_without_ffmpeg_framerate(
+    monkeypatch: pytest.MonkeyPatch,
+    session: Streamlink,
+):
+    reader = Mock()
+    monkeypatch.setattr(HLSStream, "__reader__", Mock(return_value=reader))
+
+    stream = HLSStream(session, "https://foo/playlist.m3u8")
+    result = stream.open()
+
+    reader.open.assert_called_once_with()
+    assert result is reader
+
+
 @patch("streamlink.stream.hls.hls.HLSStreamWorker.wait", Mock(return_value=True))
 class TestHLSStream(TestMixinStreamHLS, unittest.TestCase):
     def get_session(self, options=None, *args, **kwargs):

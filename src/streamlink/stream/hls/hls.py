@@ -689,6 +689,9 @@ class HLSStream(HTTPStream):
         reader = self.__reader__(self, name=self.name)
         reader.open()
 
+        if self.session.options.get("ffmpeg-framerate"):
+            return FFMPEGMuxer(self.session, reader, format="mpegts").open()
+
         return reader
 
     @classmethod
